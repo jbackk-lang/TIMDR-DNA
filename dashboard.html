@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>TIMDR-DNA — kandydaci CNV</title>
+<style>
+  :root{
+    --bg: #0e1420; --panel: #161e2d; --panel-border: #253248;
+    --text: #e6edf5; --muted: #8393ab;
+    --ok: #35d488; --warn: #f5a623; --crit: #ef4b5f; --accent: #4f9dff; --violet:#a78bfa;
+    --mono: "Consolas","SFMono-Regular",Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI",Arial,sans-serif; padding:20px 28px 40px; }
+  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px; }
+  header h1{ font-size:20px; margin:0; font-weight:600; }
+  header .sub{ color:var(--muted); font-size:12px; font-family:var(--mono); }
+  .status-pill{ padding:5px 14px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+  .status-ok{ background:rgba(53,212,136,.15); color:var(--ok); border:1px solid var(--ok); }
+  .status-crit{ background:rgba(239,75,95,.15); color:var(--crit); border:1px solid var(--crit); }
+
+  .disclaimer{ background:rgba(239,75,95,.08); border:1px solid var(--crit); color:#ffb4c0; border-radius:8px; padding:10px 14px; font-size:12px; margin-bottom:16px; line-height:1.5; }
+  .disclaimer b{ color:#fff; }
+
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:12px 16px; margin-bottom:14px; }
+  .controls label{ font-size:12px; color:var(--muted); margin-right:2px; }
+  .controls input[type=text], .controls input[type=number], .controls select{ background:#0c121d; border:1px solid var(--panel-border); color:var(--text); border-radius:6px; padding:6px 8px; font-size:12px; }
+  .controls input[type=text]{ width:120px; } .controls input[type=number]{ width:80px; }
+  .controls button{ background:var(--accent); color:#04101f; border:none; border-radius:6px; padding:8px 16px; font-weight:700; font-size:12px; cursor:pointer; }
+  .controls button:hover{ filter:brightness(1.1); }
+  #err{ color:var(--crit); font-size:12px; font-family:var(--mono); margin-left:auto; white-space:pre-wrap; max-width:420px; }
+  .note{ font-size:12px; color:var(--muted); margin:2px 0 16px 2px; font-style:italic; }
+
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+  .card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:16px 18px; }
+  .card .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+  .card .value{ font-size:22px; font-weight:700; margin-top:6px; font-family:var(--mono); }
+
+  .panel{ background:var(--panel); border:1px solid var(--panel-border); border-radius:10px; padding:16px 18px; margin-bottom:14px; overflow:hidden; }
+  .panel h2{ font-size:13px; margin:0 0 10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+  .legend{ font-size:10px; color:var(--muted); margin-bottom:6px; }
+  .legend span{ margin-right:12px; }
+  .legend .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+  canvas{ max-width:100%; width:100%; display:block; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ text-align:left; padding:6px 8px; border-bottom:1px solid var(--panel-border); }
+  th{ color:var(--muted); font-weight:600; text-transform:uppercase; font-size:10px; }
+  tr.del td.kind{ color:var(--crit); } tr.dup td.kind{ color:var(--warn); }
+  footer{ margin-top:20px; color:var(--muted); font-size:11px; font-family:var(--mono); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧬 TIMDR-DNA</h1>
+    <div class="sub">kandydaci CNV (delecje/duplikacje) z glebokosci pokrycia — TIMDRCore (anomalia/defekt/rezonans)</div>
+  </div>
+  <div id="statusPill" class="status-pill status-ok">brak danych</div>
+</header>
+
+<div class="disclaimer">
+  <b>Zastrzeżenie:</b> narzędzie badawczo-edukacyjne. NIE jest narzędziem diagnostycznym ani klinicznym,
+  nie zastępuje CNVnator/CNVkit/GATK ani konsultacji z genetykiem/lekarzem.
+  Domyślnie pokazuje SYNTETYCZNE dane demo, nie dane pacjenta.
+</div>
+
+<div class="controls">
+  <label>źródło</label>
+  <select id="inSource">
+    <option value="demo" selected>demo (syntetyczne)</option>
+    <option value="file">plik (samtools depth)</option>
+  </select>
+
+  <span id="demoFields">
+    <label>długość</label><input id="inLength" type="number" value="6000" step="500">
+    <label>seed</label><input id="inSeed" type="number" value="42">
+    <label>delecja</label><input id="inDel" type="text" value="1500-1700">
+    <label>duplikacja</label><input id="inDup" type="text" value="4200-4450">
+  </span>
+  <span id="fileFields" style="display:none;">
+    <label>ścieżka do pliku</label><input id="inPath" type="text" value="" placeholder="chr1_depth.tsv" style="width:220px;">
+  </span>
+
+  <label>okno</label><input id="inWindow" type="number" value="50" step="10">
+  <label>rezonans_min</label><input id="inRez" type="number" value="2" min="1" max="2">
+  <button id="btnAnalyze">▶ Analizuj</button>
+  <span id="err"></span>
+</div>
+<div class="note" id="dataNote">Kliknij "Analizuj" (domyślnie: dane demo z wstrzykniętą delecją i duplikacją).</div>
+
+<div class="cards" id="cardsBox"></div>
+
+<div class="panel">
+  <h2>log2(głębokość okna / mediana) wzdłuż pozycji</h2>
+  <div class="legend">
+    <span><i class="dot" style="background:#4f9dff"></i>log2_ratio</span>
+    <span><i class="dot" style="background:#ef4b5f"></i>możliwa delecja</span>
+    <span><i class="dot" style="background:#f5a623"></i>możliwa duplikacja</span>
+  </div>
+  <canvas id="chart" height="260"></canvas>
+</div>
+
+<div class="panel">
+  <h2>Kandydaci CNV</h2>
+  <table id="candTable">
+    <thead><tr><th>Pozycja</th><th>Rodzaj</th><th>log2_ratio</th><th>głębokość</th><th>rezonans</th></tr></thead>
+    <tbody><tr><td colspan="5" style="color:var(--muted);">—</td></tr></tbody>
+  </table>
+</div>
+
+<footer id="footerNote">TIMDR-DNA — kandydaci CNV z głębokości pokrycia (TIMDRCore: anomalia/defekt/rezonans).</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+$("inSource").addEventListener("change", () => {
+  const isFile = $("inSource").value === "file";
+  $("demoFields").style.display = isFile ? "none" : "inline";
+  $("fileFields").style.display = isFile ? "inline" : "none";
+});
+
+function drawChart(canvas, positions, log2ratio, candidates) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.clientWidth || 900, H = canvas.height;
+  canvas.width = W; canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!positions.length) return;
+  const padL = 46, padR = 10, padT = 10, padB = 24;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const xMin = positions[0], xMax = positions[positions.length - 1];
+  const yAbsMax = Math.max(1, ...log2ratio.map(v => Math.abs(v)));
+  const yMin = -yAbsMax * 1.15, yMax = yAbsMax * 1.15;
+
+  const xOf = (x) => padL + (x - xMin) / Math.max(1, (xMax - xMin)) * plotW;
+  const yOf = (y) => padT + (yMax - y) / Math.max(1e-9, (yMax - yMin)) * plotH;
+
+  // siatka + os zera
+  ctx.strokeStyle = "#253248"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, yOf(0)); ctx.lineTo(W - padR, yOf(0)); ctx.stroke();
+  ctx.fillStyle = "#8393ab"; ctx.font = "10px Consolas,monospace";
+  ctx.fillText("0", padL - 14, yOf(0) + 3);
+  ctx.fillText(yMax.toFixed(1), padL - 30, padT + 8);
+  ctx.fillText(yMin.toFixed(1), padL - 30, H - padB);
+
+  // linia log2_ratio
+  ctx.strokeStyle = "#4f9dff"; ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  positions.forEach((x, i) => {
+    const px = xOf(x), py = yOf(log2ratio[i]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // markery kandydatow
+  candidates.forEach(c => {
+    ctx.fillStyle = c.kind.includes("delecja") ? "#ef4b5f" : "#f5a623";
+    ctx.beginPath();
+    ctx.arc(xOf(c.position), yOf(c.log2_ratio), 4, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = "#8393ab";
+  ctx.fillText(String(Math.round(xMin)), padL, H - 6);
+  ctx.fillText(String(Math.round(xMax)), W - padR - 40, H - 6);
+}
+
+async function analyze() {
+  $("err").textContent = "";
+  const source = $("inSource").value;
+  const params = new URLSearchParams({
+    source, window: $("inWindow").value, rezonans_min: $("inRez").value,
+  });
+  if (source === "file") {
+    params.set("path", $("inPath").value);
+  } else {
+    params.set("length", $("inLength").value);
+    params.set("seed", $("inSeed").value);
+    params.set("deletion", $("inDel").value);
+    params.set("duplication", $("inDup").value);
+  }
+
+  let data;
+  try {
+    const res = await fetch("/api/analyze?" + params.toString());
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+  } catch (e) {
+    $("err").textContent = "Błąd: " + e.message;
+    $("statusPill").textContent = "błąd"; $("statusPill").className = "status-pill status-crit";
+    return;
+  }
+
+  $("statusPill").textContent = data.candidates.length ? (data.candidates.length + " kandydatów") : "brak kandydatów";
+  $("statusPill").className = "status-pill " + (data.candidates.length ? "status-crit" : "status-ok");
+  $("dataNote").textContent = `Źródło: ${data.source}. Okien: ${data.window_positions.length}. Mediana głębokości: ${data.median_depth.toFixed(1)}.`;
+
+  $("cardsBox").innerHTML = `
+    <div class="card"><div class="label">Okna</div><div class="value">${data.window_positions.length}</div></div>
+    <div class="card"><div class="label">Mediana głębokości</div><div class="value">${data.median_depth.toFixed(1)}</div></div>
+    <div class="card"><div class="label">Kandydaci CNV</div><div class="value">${data.candidates.length}</div></div>
+  `;
+
+  drawChart($("chart"), data.window_positions, data.log2_ratio, data.candidates);
+
+  const tbody = document.querySelector("#candTable tbody");
+  if (!data.candidates.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);">brak kandydatów przy obecnych progach</td></tr>';
+  } else {
+    tbody.innerHTML = data.candidates.map(c => `
+      <tr class="${c.kind.includes('delecja') ? 'del' : 'dup'}">
+        <td>${Math.round(c.position)}</td>
+        <td class="kind">${c.kind}</td>
+        <td>${c.log2_ratio.toFixed(2)}</td>
+        <td>${c.depth.toFixed(1)}</td>
+        <td>${c.rezonans_count}/2</td>
+      </tr>`).join("");
+  }
+}
+
+$("btnAnalyze").addEventListener("click", analyze);
+window.addEventListener("load", analyze);
+</script>
+</body>
+</html>
