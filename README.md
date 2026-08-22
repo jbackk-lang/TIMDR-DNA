@@ -8,18 +8,9 @@
 > badawczych/edukacyjnych nad frameworkiem sygnałowym TIMDR. Nie zawiera
 > ani nie przetwarza żadnych prawdziwych danych pacjentów.
 
-## To repo ZASTĘPUJE `trm-dna-stabilizer`
+## Co to robi
 
-Poprzednie repo (`trm-dna-stabilizer`) było jawnie oznaczone we własnym
-README jako "conceptual model / thinking tool, not a scientific theory
-or empirical model" - metafora podwójnej helisy jako "pola
-topologicznego". Jedyny plik kodu (`dna_stabilizer.rs`) operował na
-abstrakcyjnym `Vec<u64>` z dekoracyjnymi maskami bitowymi
-(`0x5A5A_0000_0000_5A5A`) i sztywnym progiem - bez importu żadnej
-prawdziwej sekwencji DNA, bez adaptacyjnego progu liczonego z danych,
-bez jakiegokolwiek realnego algorytmu bioinformatycznego pod spodem.
-
-**TIMDR-DNA robi coś innego i realnego**: wykrywa kandydatów na warianty
+**TIMDR-DNA** wykrywa kandydatów na warianty
 liczby kopii (CNV - copy-number variants: delecje/duplikacje) z
 prawdziwego formatu danych bioinformatycznych - głębokości pokrycia
 (depth-of-coverage) wzdłuż pozycji genomowej, tym samym generycznym
