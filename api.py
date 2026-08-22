@@ -109,8 +109,30 @@ def analyze():
     return jsonify(_clean(result))
 
 
+def _open_browser_when_ready(url: str, delay: float = 1.2) -> None:
+    """Otwiera przegladarke z krotkim opoznieniem, w osobnym watku.
+
+    NAPRAWIONE wzgledem wzorca z analizator-gieldowy-v3/run.bat (`start ""
+    http://...` PRZED odpaleniem serwera) - to jest dokladnie ten sam wyscig,
+    ktory juz raz byl znaleziony i naprawiony w Synoptyk-v2.0/run.bat
+    (przegladarka otwierala sie, zanim serwer zdazyl zaczac nasluchiwac,
+    dajac "nie mozna polaczyc"). Tutaj otwieramy przegladarke z poziomu
+    Pythona, PO starcie `app.run()` (w osobnym watku z opoznieniem), nie z
+    poziomu .bat przed nim - ten sam duch naprawy, co `inbrowser=True` w
+    gui_app.py Synoptyka.
+    """
+    import threading
+    import webbrowser
+
+    def _do_open():
+        webbrowser.open(url)
+
+    threading.Timer(delay, _do_open).start()
+
+
 if __name__ == "__main__":
     # Port 8070 (nie 8060, ktorego uzywa analizator-gieldowy-v3, ani 8000/5060 -
     # patrz komentarze o kolizjach portow w innych repo tego zestawu) - zeby
     # dashboard TIMDR-DNA mogl dzialac obok innych bez konfliktu.
+    _open_browser_when_ready("http://127.0.0.1:8070")
     app.run(host="127.0.0.1", port=8070, debug=False, threaded=True)
