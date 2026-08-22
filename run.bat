@@ -55,7 +55,7 @@ if not exist "api.py" (
 
 echo.
 echo [2/2] Uruchamianie API + dashboard pod http://127.0.0.1:8070 ...
-echo Przegladarka NIE otwiera sie sama - wejdz recznie na powyzszy adres.
+echo Przegladarka otworzy sie sama za chwile (moze zajac 1-2 sekundy).
 echo Nacisnij CTRL+C, aby zatrzymac serwer.
 echo ---------------------------------------------------
 echo.
