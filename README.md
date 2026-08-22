@@ -60,11 +60,32 @@ zamiast jednego wytrenowanego modelu ML.
 4. Kandydat jest oznaczany jako "możliwa delecja" (log2_ratio < 0) albo
    "możliwa duplikacja" (log2_ratio > 0).
 
-## Użycie
+## Dashboard + API (Flask)
+
+```bash
+run.bat                      # Windows: instaluje zaleznosci, odpala serwer
+# lub recznie:
+pip install -r requirements.txt
+python api.py                 # http://127.0.0.1:8070
+```
+
+Endpointy:
+- `GET /` - dashboard (Canvas 2D, ciemny motyw, bez CDN - ten sam styl co `analizator-gieldowy-v3`)
+- `GET /api/health`
+- `GET /api/analyze?source=demo&length=6000&deletion=1500-1700&duplication=4200-4450&window=50&rezonans_min=2`
+- `GET /api/analyze?source=file&path=chr1_depth.tsv&window=50` - realny plik `samtools depth`
+
+Dashboard domyslnie laduje dane demo z wstrzyknieta delecja i duplikacja,
+rysuje `log2_ratio` wzdluz pozycji i oznacza wykrytych kandydatow
+kolorowymi punktami (czerwony = delecja, pomaranczowy = duplikacja) +
+tabela z lista kandydatow. Port 8070 (nie 8060 jak `analizator-gieldowy-v3`,
+zeby oba dzialaly rownolegle bez kolizji).
+
+## Użycie (programowo / bez dashboardu)
 
 ```bash
 pip install -r requirements.txt
-pytest tests/ -q   # 13 testów
+pytest tests/ -q   # 19 testów (13 rdzen + 6 API)
 ```
 
 ```python
@@ -84,7 +105,9 @@ result = analyze_coverage(positions, depth, window=50)
 
 ## Testy
 
-13 testów w `tests/test_timdr_dna.py`: generowanie syntetycznych danych
+19 testów łącznie: 13 w `tests/test_timdr_dna.py` (silnik/dane) + 6 w `tests/test_api.py` (endpointy Flask, w tym błędne parametry -> 400).
+
+`tests/test_timdr_dna.py`: generowanie syntetycznych danych
 (kształt, że delecja/duplikacja faktycznie mają inną głębokość),
 `bin_coverage()` (agregacja, pusta seria), `analyze_coverage()`
 integracyjnie - **wykrywa wstrzyknięte, znane z góry regiony delecji i
