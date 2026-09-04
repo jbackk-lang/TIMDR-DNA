@@ -76,6 +76,10 @@ def health():
     return jsonify({"status": "ok", "disclaimer": DISCLAIMER})
 
 
+def _truthy(raw: str | None) -> bool:
+    return (raw or "").strip().lower() in ("1", "true", "tak", "yes", "on")
+
+
 @app.route("/api/analyze")
 def analyze():
     source = request.args.get("source", "demo")
@@ -83,11 +87,19 @@ def analyze():
     rezonans_min = int(request.args.get("rezonans_min", 2))
 
     try:
+        reference_depth = None
         if source == "file":
             path = request.args.get("path")
             if not path:
                 return jsonify({"error": "parametr 'path' wymagany dla source=file"}), 400
             positions, depth = load_depth_tsv(path)
+
+            reference_path = request.args.get("reference_path")
+            if reference_path:
+                # tylko glebokosc jest uzywana - analyze_coverage() wymaga tej
+                # samej dlugosci/wyrownanej osi pozycji co probka case, patrz
+                # jego docstring za pelne uzasadnienie tego wymogu
+                _ref_positions, reference_depth = load_depth_tsv(reference_path)
         else:
             length = int(request.args.get("length", 6000))
             seed = int(request.args.get("seed", 42))
@@ -99,7 +111,20 @@ def analyze():
                 duplication_region=duplication_region,
             )
 
-        result = analyze_coverage(positions, depth, window=window, rezonans_min=rezonans_min)
+            if _truthy(request.args.get("reference")):
+                # syntetyczna probka "referencyjna" (BEZ wstrzykniętych
+                # wariantow) tej samej dlugosci/ziarna - demonstruje
+                # normalizacje wzgledem referencji bez potrzeby prawdziwego
+                # pliku, patrz README sekcja o probce referencyjnej
+                _ref_positions, reference_depth = generate_synthetic_coverage(
+                    length=length, seed=seed,
+                    deletion_region=None, duplication_region=None,
+                )
+
+        result = analyze_coverage(
+            positions, depth, window=window, rezonans_min=rezonans_min,
+            reference_depth=reference_depth,
+        )
     except (CoverageFileError, ValueError) as e:
         return jsonify({"error": str(e)}), 400
 
