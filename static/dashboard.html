@@ -77,9 +77,11 @@
     <label>seed</label><input id="inSeed" type="number" value="42">
     <label>delecja</label><input id="inDel" type="text" value="1500-1700">
     <label>duplikacja</label><input id="inDup" type="text" value="4200-4450">
+    <label title="generuje drugą syntetyczną serię BEZ wariantów jako odniesienie, zamiast normalizować względem własnej mediany"><input id="inRefDemo" type="checkbox"> referencja (demo)</label>
   </span>
   <span id="fileFields" style="display:none;">
     <label>ścieżka do pliku</label><input id="inPath" type="text" value="" placeholder="chr1_depth.tsv" style="width:220px;">
+    <label>plik referencyjny (opcjonalnie)</label><input id="inRefPath" type="text" value="" placeholder="chr1_normal_depth.tsv" style="width:200px;">
   </span>
 
   <label>okno</label><input id="inWindow" type="number" value="50" step="10">
@@ -104,8 +106,8 @@
 <div class="panel">
   <h2>Kandydaci CNV</h2>
   <table id="candTable">
-    <thead><tr><th>Pozycja</th><th>Rodzaj</th><th>log2_ratio</th><th>głębokość</th><th>rezonans</th></tr></thead>
-    <tbody><tr><td colspan="5" style="color:var(--muted);">—</td></tr></tbody>
+    <thead><tr><th>Pozycja</th><th>Rodzaj</th><th>log2_ratio</th><th>magnitude</th><th>głębokość</th><th>rezonans</th></tr></thead>
+    <tbody><tr><td colspan="6" style="color:var(--muted);">—</td></tr></tbody>
   </table>
 </div>
 
@@ -175,11 +177,13 @@ async function analyze() {
   });
   if (source === "file") {
     params.set("path", $("inPath").value);
+    if ($("inRefPath").value.trim()) params.set("reference_path", $("inRefPath").value.trim());
   } else {
     params.set("length", $("inLength").value);
     params.set("seed", $("inSeed").value);
     params.set("deletion", $("inDel").value);
     params.set("duplication", $("inDup").value);
+    if ($("inRefDemo").checked) params.set("reference", "1");
   }
 
   let data;
@@ -195,25 +199,30 @@ async function analyze() {
 
   $("statusPill").textContent = data.candidates.length ? (data.candidates.length + " kandydatów") : "brak kandydatów";
   $("statusPill").className = "status-pill " + (data.candidates.length ? "status-crit" : "status-ok");
-  $("dataNote").textContent = `Źródło: ${data.source}. Okien: ${data.window_positions.length}. Mediana głębokości: ${data.median_depth.toFixed(1)}.`;
+  const refNote = data.reference_used
+    ? ` Odniesienie: PRÓBKA REFERENCYJNA (mediana ${data.median_reference_depth.toFixed(1)}), nie własna mediana — patrz README.`
+    : " Odniesienie: własna mediana serii (bez próbki referencyjnej).";
+  $("dataNote").textContent = `Źródło: ${data.source}. Okien: ${data.window_positions.length}. Mediana głębokości: ${data.median_depth.toFixed(1)}.` + refNote;
 
   $("cardsBox").innerHTML = `
     <div class="card"><div class="label">Okna</div><div class="value">${data.window_positions.length}</div></div>
     <div class="card"><div class="label">Mediana głębokości</div><div class="value">${data.median_depth.toFixed(1)}</div></div>
     <div class="card"><div class="label">Kandydaci CNV</div><div class="value">${data.candidates.length}</div></div>
+    <div class="card"><div class="label">Odniesienie</div><div class="value" style="font-size:14px;">${data.reference_used ? "referencja" : "własna mediana"}</div></div>
   `;
 
   drawChart($("chart"), data.window_positions, data.log2_ratio, data.candidates);
 
   const tbody = document.querySelector("#candTable tbody");
   if (!data.candidates.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);">brak kandydatów przy obecnych progach</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);">brak kandydatów przy obecnych progach</td></tr>';
   } else {
     tbody.innerHTML = data.candidates.map(c => `
       <tr class="${c.kind.includes('delecja') ? 'del' : 'dup'}">
         <td>${Math.round(c.position)}</td>
         <td class="kind">${c.kind}</td>
         <td>${c.log2_ratio.toFixed(2)}</td>
+        <td>${c.magnitude.toFixed(2)}</td>
         <td>${c.depth.toFixed(1)}</td>
         <td>${c.rezonans_count}/2</td>
       </tr>`).join("");
