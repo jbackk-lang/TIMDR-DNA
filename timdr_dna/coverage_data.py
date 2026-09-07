@@ -32,6 +32,24 @@ def generate_synthetic_coverage(
     `deletion_region`/`duplication_region` = (start, end) w jednostkach
     pozycji (indeksy tablicy); None wylacza dany region.
     """
+    def _validate_region(region, name):
+        # NAPRAWA (znaleziona tym poprzez test, ktory podal length=1000 z
+        # domyslnym deletion_region=(1500,1700) - poza zakresem): bez tej
+        # walidacji, region wykraczajacy poza `length` dawal nieczytelny
+        # blad numpy przy proba przypisania ("could not broadcast input
+        # array from shape (200,) into shape (0,)"), nie jasny komunikat.
+        if region is None:
+            return
+        s, e = region
+        if not (0 <= s < e <= length):
+            raise ValueError(
+                f"{name}={region} wykracza poza zakres serii (length={length}) - "
+                f"wymagane 0 <= start < end <= {length}."
+            )
+
+    _validate_region(deletion_region, "deletion_region")
+    _validate_region(duplication_region, "duplication_region")
+
     rng = np.random.default_rng(seed)
     positions = np.arange(length)
 
